@@ -28,6 +28,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
@@ -87,6 +88,9 @@ type PrintRunner struct {
 
 	// allowExperimentalGatewayAPI indicates whether Experimental Gateway API features (like CORS, URLRewrite) should be included in the output.
 	allowExperimentalGatewayAPI bool
+
+	// write output to files instead of stdout
+	writeToFile bool
 }
 
 // PrintGatewayAPIObjects performs necessary steps to digest and print
@@ -174,7 +178,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 		resourceCount += len(r.GatewayClasses)
 		for _, gatewayClass := range r.GatewayClasses {
 			gatewayClass := gatewayClass
-			err := pr.resourcePrinter.PrintObj(&gatewayClass, os.Stdout)
+			err := pr.writeResult(&gatewayClass, gatewayClass.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s GatewayClass: %v\n", gatewayClass.Name, err)
 			}
@@ -189,7 +193,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				gateway.Annotations = make(map[string]string)
 			}
 			gateway.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&gateway, os.Stdout)
+			err := pr.writeResult(&gateway, gateway.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s Gateway: %v\n", gateway.Name, err)
 			}
@@ -204,7 +208,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				httpRoute.Annotations = make(map[string]string)
 			}
 			httpRoute.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&httpRoute, os.Stdout)
+			err := pr.writeResult(&httpRoute, httpRoute.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s HTTPRoute: %v\n", httpRoute.Name, err)
 			}
@@ -219,7 +223,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				grpcRoute.Annotations = make(map[string]string)
 			}
 			grpcRoute.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&grpcRoute, os.Stdout)
+			err := pr.writeResult(&grpcRoute, grpcRoute.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s GRPCRoute: %v\n", grpcRoute.Name, err)
 			}
@@ -234,7 +238,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				tlsRoute.Annotations = make(map[string]string)
 			}
 			tlsRoute.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&tlsRoute, os.Stdout)
+			err := pr.writeResult(&tlsRoute, tlsRoute.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s TLSRoute: %v\n", tlsRoute.Name, err)
 			}
@@ -249,7 +253,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				tcpRoute.Annotations = make(map[string]string)
 			}
 			tcpRoute.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&tcpRoute, os.Stdout)
+			err := pr.writeResult(&tcpRoute, tcpRoute.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s TCPRoute: %v\n", tcpRoute.Name, err)
 			}
@@ -264,7 +268,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				udpRoute.Annotations = make(map[string]string)
 			}
 			udpRoute.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&udpRoute, os.Stdout)
+			err := pr.writeResult(&udpRoute, udpRoute.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s UDPRoute: %v\n", udpRoute.Name, err)
 			}
@@ -279,7 +283,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				backendTLSPolicy.Annotations = make(map[string]string)
 			}
 			backendTLSPolicy.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&backendTLSPolicy, os.Stdout)
+			err := pr.writeResult(&backendTLSPolicy, backendTLSPolicy.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s BackendTLSPolicy: %v\n", backendTLSPolicy.Name, err)
 			}
@@ -294,7 +298,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 				referenceGrant.Annotations = make(map[string]string)
 			}
 			referenceGrant.Annotations[i2gw.GeneratorAnnotationKey] = fmt.Sprintf("ingress2gateway-%s", i2gw.Version)
-			err := pr.resourcePrinter.PrintObj(&referenceGrant, os.Stdout)
+			err := pr.writeResult(&referenceGrant, referenceGrant.Name)
 			if err != nil {
 				fmt.Printf("# Error printing %s ReferenceGrant: %v\n", referenceGrant.Name, err)
 			}
@@ -306,7 +310,7 @@ func (pr *PrintRunner) outputResult(gatewayResources []i2gw.GatewayResources) {
 		for _, gatewayExtension := range r.GatewayExtensions {
 			gatewayExtension := gatewayExtension
 			fmt.Println("---")
-			if err := PrintUnstructuredAsYaml(&gatewayExtension); err != nil {
+			if err := pr.writeResult(&gatewayExtension, gatewayExtension.GetName()); err != nil {
 				fmt.Printf("# Error printing %s gatewayExtension: %v\n", gatewayExtension.GetName(), err)
 			}
 		}
@@ -423,6 +427,8 @@ if specified with --namespace.`)
 
 	cmd.Flags().BoolVar(&pr.allowExperimentalGatewayAPI, "allow-experimental-gw-api", false, "If present, the tool will include Experimental Gateway API fields (e.g. CORS, URLRewrite) in the output. Default is false.")
 
+	cmd.Flags().BoolVar(&pr.writeToFile, "write-to-file", false, "If present, the tool will write output resources to files instead to stdout")
+
 	pr.providerSpecificFlags = make(map[string]*string)
 	for provider, flags := range i2gw.GetProviderSpecificFlagDefinitions() {
 		for _, flag := range flags {
@@ -480,4 +486,17 @@ func PrintUnstructuredAsYaml(obj *unstructured.Unstructured) error {
 	}
 
 	return nil
+}
+
+func (pr *PrintRunner) writeResult(obj runtime.Object, name string) error {
+	writer := os.Stdout
+	if pr.writeToFile {
+		file, err := os.Create(fmt.Sprintf("%s.yaml", name))
+		if err != nil {
+			return err
+		}
+		writer = file
+		defer file.Close()
+	}
+	return pr.resourcePrinter.PrintObj(obj, writer)
 }
