@@ -1,3 +1,5 @@
+# Fork
+this is forked from kubernetes-sigs/ingress2gateway with the addition of the flag `write-to-file` that will write the generated resources to files instead of stdout.
 # Ingress to Gateway
 
 Ingress2gateway helps translate Ingress and provider-specific
